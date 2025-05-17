@@ -1,221 +1,167 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>R.K. Store Billing</title>
-<style>
-  body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 0 15px; }
-  h1 { text-align: center; color: #333; }
-  label { display: block; margin: 8px 0 4px; }
-  input[type=text], input[type=number] { width: 100%; padding: 6px; margin-bottom: 10px; }
-  button { padding: 8px 15px; background: #007bff; color: white; border: none; cursor: pointer; }
-  button:hover { background: #0056b3; }
-  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-  tfoot td { font-weight: bold; }
-  .bill { border: 1px solid #333; padding: 15px; margin-top: 30px; }
-  .footer-messages { margin-top: 15px; font-style: italic; color: #555; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>R.K. Store Billing</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    input, button { margin: 5px; padding: 5px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+    .product-row button { margin-right: 5px; }
+    #scanner-container { display: none; position: relative; }
+    #video { width: 100%; max-width: 400px; }
+  </style>
 </head>
 <body>
+  <h2>R.K. Store Billing System</h2>
 
-<h1>R.K. Store - Billing System</h1>
-
-<section>
-  <h2>Add Product</h2>
-  <label for="pname">Product Name</label>
-  <input type="text" id="pname" placeholder="Enter product name" />
-  <label for="pprice">Price (₹)</label>
-  <input type="number" id="pprice" placeholder="Enter price" min="0" />
-  <label for="pqty">Quantity in Stock</label>
-  <input type="number" id="pqty" placeholder="Enter stock quantity" min="0" />
+  <h3>Add New Product</h3>
+  <input id="pname" placeholder="Product Name" />
+  <input id="pprice" type="number" placeholder="Price" />
+  <input id="pbarcode" placeholder="Barcode (optional)" />
   <button onclick="addProduct()">Add Product</button>
-</section>
 
-<section>
-  <h2>Create Bill</h2>
-  <label for="select-product">Select Product</label>
-  <select id="select-product"></select>
-  <label for="bill-qty">Quantity</label>
-  <input type="number" id="bill-qty" value="1" min="1" />
-  <button onclick="addToBill()">Add to Bill</button>
+  <h3>Product List</h3>
+  <div id="product-list"></div>
 
-  <table id="bill-table" style="display:none;">
+  <h3>Billing</h3>
+  <input id="scan-barcode" placeholder="Scan Barcode Here" oninput="scanBarcode()" />
+  <table>
     <thead>
-      <tr><th>Product</th><th>Qty</th><th>Price (₹)</th><th>Total (₹)</th><th>Action</th></tr>
+      <tr><th>Product</th><th>Price</th><th>Quantity</th><th>Total</th></tr>
     </thead>
-    <tbody></tbody>
+    <tbody id="bill-body"></tbody>
     <tfoot>
-      <tr><td colspan="3">Grand Total</td><td id="grand-total">0</td><td></td></tr>
+      <tr><td colspan="3">Grand Total</td><td id="bill-grand-total">₹0.00</td></tr>
     </tfoot>
   </table>
+  <button onclick="printBill()">Print Bill</button>
 
-  <button id="print-btn" style="display:none;" onclick="printBill()">Print / Download Bill</button>
-</section>
-
-<section id="bill-section" class="bill" style="display:none;">
-  <h2>Bill - R.K. Store</h2>
-  <p>Contact: 9365426588</p>
-  <p>Date: <span id="bill-date"></span></p>
-  <table id="bill-items" style="width:100%; border-collapse: collapse;">
-    <thead>
-      <tr><th style="border:1px solid #333; padding:5px;">Product</th><th style="border:1px solid #333; padding:5px;">Qty</th><th style="border:1px solid #333; padding:5px;">Price (₹)</th><th style="border:1px solid #333; padding:5px;">Total (₹)</th></tr>
-    </thead>
-    <tbody></tbody>
-    <tfoot>
-      <tr><td colspan="3" style="border:1px solid #333; padding:5px; font-weight:bold;">Grand Total</td><td style="border:1px solid #333; padding:5px; font-weight:bold;" id="bill-grand-total"></td></tr>
-    </tfoot>
-  </table>
-  <div class="footer-messages">
-    <p>We’re glad you came by—come again soon!</p>
-    <p>Thanks a lot! You just made our day!</p>
+  <h3>Barcode Camera Scanner</h3>
+  <button onclick="toggleScanner()">Start/Stop Camera Scanner</button>
+  <div id="scanner-container">
+    <video id="video" autoplay></video>
   </div>
-</section>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 <script>
-  let products = [];
+  let products = JSON.parse(localStorage.getItem('products') || '[]');
   let billItems = [];
 
+  function saveProducts() {
+    localStorage.setItem('products', JSON.stringify(products));
+    displayProducts();
+  }
+
   function addProduct() {
-    const name = document.getElementById('pname').value.trim();
-    const price = parseFloat(document.getElementById('pprice').value);
-    const qty = parseInt(document.getElementById('pqty').value);
-
-    if (!name || isNaN(price) || price <= 0 || isNaN(qty) || qty < 0) {
-      alert('Please enter valid product details');
-      return;
+    const name = pname.value.trim();
+    const price = parseFloat(pprice.value);
+    const barcode = pbarcode.value.trim();
+    if (name && !isNaN(price)) {
+      products.push({ name, price, barcode });
+      saveProducts();
+      pname.value = pprice.value = pbarcode.value = '';
     }
-
-    // Check if product already exists
-    const existingIndex = products.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
-    if (existingIndex !== -1) {
-      alert('Product already exists. Please edit it from the list.');
-      return;
-    }
-
-    products.push({ name, price, qty });
-    updateProductSelect();
-    alert('Product added!');
-    document.getElementById('pname').value = '';
-    document.getElementById('pprice').value = '';
-    document.getElementById('pqty').value = '';
   }
 
-  function updateProductSelect() {
-    const select = document.getElementById('select-product');
-    select.innerHTML = '<option value="">--Select Product--</option>';
-    products.forEach((p, i) => {
-      select.innerHTML += `<option value="${i}">${p.name} (₹${p.price}, Stock: ${p.qty})</option>`;
-    });
+  function displayProducts() {
+    const list = products.map((p, i) => `
+      <div class="product-row">
+        ${p.name} - ₹${p.price} ${p.barcode ? '(Barcode: ' + p.barcode + ')' : ''}
+        <button onclick="editProduct(${i})">Edit</button>
+        <button onclick="deleteProduct(${i})">Delete</button>
+      </div>
+    `).join('');
+    document.getElementById('product-list').innerHTML = list;
   }
 
-  function addToBill() {
-    const select = document.getElementById('select-product');
-    const productIndex = select.value;
-    const qty = parseInt(document.getElementById('bill-qty').value);
-
-    if (productIndex === '' || isNaN(qty) || qty <= 0) {
-      alert('Select a product and enter valid quantity');
-      return;
+  function editProduct(index) {
+    const p = products[index];
+    const name = prompt('Edit name:', p.name);
+    const price = parseFloat(prompt('Edit price:', p.price));
+    const barcode = prompt('Edit barcode (optional):', p.barcode);
+    if (name && !isNaN(price)) {
+      products[index] = { name, price, barcode };
+      saveProducts();
     }
+  }
 
-    const product = products[productIndex];
-    if (qty > product.qty) {
-      alert('Not enough stock');
-      return;
+  function deleteProduct(index) {
+    if (confirm('Delete this product?')) {
+      products.splice(index, 1);
+      saveProducts();
     }
+  }
 
-    // Deduct stock
-    products[productIndex].qty -= qty;
-    updateProductSelect();
+  function scanBarcode() {
+    const code = document.getElementById('scan-barcode').value.trim();
+    const found = products.find(p => p.barcode === code);
+    if (found) {
+      addToBill(found);
+      document.getElementById('scan-barcode').value = '';
+    }
+  }
 
-    // Check if product already in bill
-    const billIndex = billItems.findIndex(item => item.name === product.name);
-    if (billIndex !== -1) {
-      billItems[billIndex].qty += qty;
-      billItems[billIndex].total = billItems[billIndex].qty * billItems[billIndex].price;
+  function addToBill(product) {
+    const existing = billItems.find(item => item.name === product.name);
+    if (existing) {
+      existing.qty++;
+      existing.total = existing.qty * existing.price;
     } else {
-      billItems.push({ name: product.name, qty, price: product.price, total: qty * product.price });
+      billItems.push({ name: product.name, price: product.price, qty: 1, total: product.price });
     }
-
     updateBillTable();
   }
 
   function updateBillTable() {
-    const table = document.getElementById('bill-table');
-    const tbody = table.querySelector('tbody');
-    tbody.innerHTML = '';
-    let grandTotal = 0;
-
-    billItems.forEach((item, i) => {
-      grandTotal += item.total;
-      tbody.innerHTML += `<tr>
-        <td>${item.name}</td>
-        <td>${item.qty}</td>
-        <td>₹${item.price.toFixed(2)}</td>
-        <td>₹${item.total.toFixed(2)}</td>
-        <td><button onclick="removeBillItem(${i})">Remove</button></td>
-      </tr>`;
-    });
-
-    document.getElementById('grand-total').textContent = '₹' + grandTotal.toFixed(2);
-    if (billItems.length > 0) {
-      table.style.display = '';
-      document.getElementById('print-btn').style.display = '';
-    } else {
-      table.style.display = 'none';
-      document.getElementById('print-btn').style.display = 'none';
-    }
-  }
-
-  function removeBillItem(index) {
-    const item = billItems[index];
-    // Return quantity to stock
-    const prodIndex = products.findIndex(p => p.name === item.name);
-    if (prodIndex !== -1) {
-      products[prodIndex].qty += item.qty;
-      updateProductSelect();
-    }
-    billItems.splice(index, 1);
-    updateBillTable();
+    const tbody = billItems.map(item => `
+      <tr><td>${item.name}</td><td>₹${item.price.toFixed(2)}</td><td>${item.qty}</td><td>₹${item.total.toFixed(2)}</td></tr>
+    `).join('');
+    document.getElementById('bill-body').innerHTML = tbody;
+    const grand = billItems.reduce((sum, item) => sum + item.total, 0);
+    document.getElementById('bill-grand-total').textContent = '₹' + grand.toFixed(2);
   }
 
   function printBill() {
-    // Fill bill section
-    const tbody = document.querySelector('#bill-items tbody');
-    tbody.innerHTML = '';
-    let grandTotal = 0;
-
-    billItems.forEach(item => {
-      grandTotal += item.total;
-      tbody.innerHTML += `<tr>
-        <td style="border:1px solid #333; padding:5px;">${item.name}</td>
-        <td style="border:1px solid #333; padding:5px;">${item.qty}</td>
-        <td style="border:1px solid #333; padding:5px;">₹${item.price.toFixed(2)}</td>
-        <td style="border:1px solid #333; padding:5px;">₹${item.total.toFixed(2)}</td>
-      </tr>`;
-    });
-
-    document.getElementById('bill-grand-total').textContent = '₹' + grandTotal.toFixed(2);
-    document.getElementById('bill-date').textContent = new Date().toLocaleString();
-
-    document.getElementById('bill-section').style.display = 'block';
-
-    // Print the bill section only
-    const printContents = document.getElementById('bill-section').innerHTML;
-    const originalContents = document.body.innerHTML;
-
-    document.body.innerHTML = printContents;
     window.print();
-    document.body.innerHTML = originalContents;
-
-    // Reset UI after print
-    updateProductSelect();
+    billItems = [];
     updateBillTable();
-    document.getElementById('bill-section').style.display = 'none';
   }
-</script>
 
+  function toggleScanner() {
+    const scanner = document.getElementById('scanner-container');
+    if (scanner.style.display === 'none') {
+      scanner.style.display = 'block';
+      startScanner();
+    } else {
+      scanner.style.display = 'none';
+      Quagga.stop();
+    }
+  }
+
+  function startScanner() {
+    Quagga.init({
+      inputStream: {
+        name: 'Live',
+        type: 'LiveStream',
+        target: document.querySelector('#video'),
+        constraints: { facingMode: 'environment' }
+      },
+      decoder: { readers: ['ean_reader', 'code_128_reader'] }
+    }, err => {
+      if (err) return console.error(err);
+      Quagga.start();
+    });
+    Quagga.onDetected(data => {
+      const code = data.codeResult.code;
+      document.getElementById('scan-barcode').value = code;
+      scanBarcode();
+    });
+  }
+
+  displayProducts();
+</script>
 </body>
 </html>
