@@ -172,26 +172,16 @@
         name: 'Live',
         type: 'LiveStream',
         target: document.querySelector('#video'),
-        constraints: {
-          width: 480,
-          height: 320,
-          facingMode: 'environment'
-        }
+        constraints: { facingMode: 'environment' }
       },
-      decoder: {
-        readers: ['ean_reader', 'code_128_reader']
-      },
+      decoder: { readers: ['ean_reader', 'code_128_reader'] },
       locate: true,
-      debug: {
-        drawBoundingBox: true,
-        showFrequency: true,
-        drawScanline: true,
-        showPattern: true
-      }
+      debug: true
     }, err => {
       if (err) return console.error(err);
       Quagga.start();
     });
+
     Quagga.onDetected(data => {
       const code = data.codeResult.code;
       document.getElementById('scan-barcode').value = code;
