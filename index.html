@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>R.K. Store Billing</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 800px; margin: 20px auto; padding: 0 15px; }
+  h1 { text-align: center; color: #333; }
+  label { display: block; margin: 8px 0 4px; }
+  input[type=text], input[type=number] { width: 100%; padding: 6px; margin-bottom: 10px; }
+  button { padding: 8px 15px; background: #007bff; color: white; border: none; cursor: pointer; }
+  button:hover { background: #0056b3; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+  tfoot td { font-weight: bold; }
+  .bill { border: 1px solid #333; padding: 15px; margin-top: 30px; }
+  .footer-messages { margin-top: 15px; font-style: italic; color: #555; }
+</style>
+</head>
+<body>
+
+<h1>R.K. Store - Billing System</h1>
+
+<section>
+  <h2>Add Product</h2>
+  <label for="pname">Product Name</label>
+  <input type="text" id="pname" placeholder="Enter product name" />
+  <label for="pprice">Price (₹)</label>
+  <input type="number" id="pprice" placeholder="Enter price" min="0" />
+  <label for="pqty">Quantity in Stock</label>
+  <input type="number" id="pqty" placeholder="Enter stock quantity" min="0" />
+  <button onclick="addProduct()">Add Product</button>
+</section>
+
+<section>
+  <h2>Create Bill</h2>
+  <label for="select-product">Select Product</label>
+  <select id="select-product"></select>
+  <label for="bill-qty">Quantity</label>
+  <input type="number" id="bill-qty" value="1" min="1" />
+  <button onclick="addToBill()">Add to Bill</button>
+
+  <table id="bill-table" style="display:none;">
+    <thead>
+      <tr><th>Product</th><th>Qty</th><th>Price (₹)</th><th>Total (₹)</th><th>Action</th></tr>
+    </thead>
+    <tbody></tbody>
+    <tfoot>
+      <tr><td colspan="3">Grand Total</td><td id="grand-total">0</td><td></td></tr>
+    </tfoot>
+  </table>
+
+  <button id="print-btn" style="display:none;" onclick="printBill()">Print / Download Bill</button>
+</section>
+
+<section id="bill-section" class="bill" style="display:none;">
+  <h2>Bill - R.K. Store</h2>
+  <p>Contact: 9365426588</p>
+  <p>Date: <span id="bill-date"></span></p>
+  <table id="bill-items" style="width:100%; border-collapse: collapse;">
+    <thead>
+      <tr><th style="border:1px solid #333; padding:5px;">Product</th><th style="border:1px solid #333; padding:5px;">Qty</th><th style="border:1px solid #333; padding:5px;">Price (₹)</th><th style="border:1px solid #333; padding:5px;">Total (₹)</th></tr>
+    </thead>
+    <tbody></tbody>
+    <tfoot>
+      <tr><td colspan="3" style="border:1px solid #333; padding:5px; font-weight:bold;">Grand Total</td><td style="border:1px solid #333; padding:5px; font-weight:bold;" id="bill-grand-total"></td></tr>
+    </tfoot>
+  </table>
+  <div class="footer-messages">
+    <p>We’re glad you came by—come again soon!</p>
+    <p>Thanks a lot! You just made our day!</p>
+  </div>
+</section>
+
+<script>
+  let products = [];
+  let billItems = [];
+
+  function addProduct() {
+    const name = document.getElementById('pname').value.trim();
+    const price = parseFloat(document.getElementById('pprice').value);
+    const qty = parseInt(document.getElementById('pqty').value);
+
+    if (!name || isNaN(price) || price <= 0 || isNaN(qty) || qty < 0) {
+      alert('Please enter valid product details');
+      return;
+    }
+
+    // Check if product already exists
+    const existingIndex = products.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
+    if (existingIndex !== -1) {
+      alert('Product already exists. Please edit it from the list.');
+      return;
+    }
+
+    products.push({ name, price, qty });
+    updateProductSelect();
+    alert('Product added!');
+    document.getElementById('pname').value = '';
+    document.getElementById('pprice').value = '';
+    document.getElementById('pqty').value = '';
+  }
+
+  function updateProductSelect() {
+    const select = document.getElementById('select-product');
+    select.innerHTML = '<option value="">--Select Product--</option>';
+    products.forEach((p, i) => {
+      select.innerHTML += `<option value="${i}">${p.name} (₹${p.price}, Stock: ${p.qty})</option>`;
+    });
+  }
+
+  function addToBill() {
+    const select = document.getElementById('select-product');
+    const productIndex = select.value;
+    const qty = parseInt(document.getElementById('bill-qty').value);
+
+    if (productIndex === '' || isNaN(qty) || qty <= 0) {
+      alert('Select a product and enter valid quantity');
+      return;
+    }
+
+    const product = products[productIndex];
+    if (qty > product.qty) {
+      alert('Not enough stock');
+      return;
+    }
+
+    // Deduct stock
+    products[productIndex].qty -= qty;
+    updateProductSelect();
+
+    // Check if product already in bill
+    const billIndex = billItems.findIndex(item => item.name === product.name);
+    if (billIndex !== -1) {
+      billItems[billIndex].qty += qty;
+      billItems[billIndex].total = billItems[billIndex].qty * billItems[billIndex].price;
+    } else {
+      billItems.push({ name: product.name, qty, price: product.price, total: qty * product.price });
+    }
+
+    updateBillTable();
+  }
+
+  function updateBillTable() {
+    const table = document.getElementById('bill-table');
+    const tbody = table.querySelector('tbody');
+    tbody.innerHTML = '';
+    let grandTotal = 0;
+
+    billItems.forEach((item, i) => {
+      grandTotal += item.total;
+      tbody.innerHTML += `<tr>
+        <td>${item.name}</td>
+        <td>${item.qty}</td>
+        <td>₹${item.price.toFixed(2)}</td>
+        <td>₹${item.total.toFixed(2)}</td>
+        <td><button onclick="removeBillItem(${i})">Remove</button></td>
+      </tr>`;
+    });
+
+    document.getElementById('grand-total').textContent = '₹' + grandTotal.toFixed(2);
+    if (billItems.length > 0) {
+      table.style.display = '';
+      document.getElementById('print-btn').style.display = '';
+    } else {
+      table.style.display = 'none';
+      document.getElementById('print-btn').style.display = 'none';
+    }
+  }
+
+  function removeBillItem(index) {
+    const item = billItems[index];
+    // Return quantity to stock
+    const prodIndex = products.findIndex(p => p.name === item.name);
+    if (prodIndex !== -1) {
+      products[prodIndex].qty += item.qty;
+      updateProductSelect();
+    }
+    billItems.splice(index, 1);
+    updateBillTable();
+  }
+
+  function printBill() {
+    // Fill bill section
+    const tbody = document.querySelector('#bill-items tbody');
+    tbody.innerHTML = '';
+    let grandTotal = 0;
+
+    billItems.forEach(item => {
+      grandTotal += item.total;
+      tbody.innerHTML += `<tr>
+        <td style="border:1px solid #333; padding:5px;">${item.name}</td>
+        <td style="border:1px solid #333; padding:5px;">${item.qty}</td>
+        <td style="border:1px solid #333; padding:5px;">₹${item.price.toFixed(2)}</td>
+        <td style="border:1px solid #333; padding:5px;">₹${item.total.toFixed(2)}</td>
+      </tr>`;
+    });
+
+    document.getElementById('bill-grand-total').textContent = '₹' + grandTotal.toFixed(2);
+    document.getElementById('bill-date').textContent = new Date().toLocaleString();
+
+    document.getElementById('bill-section').style.display = 'block';
+
+    // Print the bill section only
+    const printContents = document.getElementById('bill-section').innerHTML;
+    const originalContents = document.body.innerHTML;
+
+    document.body.innerHTML = printContents;
+    window.print();
+    document.body.innerHTML = originalContents;
+
+    // Reset UI after print
+    updateProductSelect();
+    updateBillTable();
+    document.getElementById('bill-section').style.display = 'none';
+  }
+</script>
+
+</body>
+</html>
