@@ -10,8 +10,29 @@
     table { width: 100%; border-collapse: collapse; margin-top: 20px; }
     th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
     .product-row button { margin-right: 5px; }
-    #scanner-container { display: none; position: relative; }
-    #video { width: 100%; max-width: 400px; }
+    #scanner-container { display: none; position: relative; margin-top: 15px; }
+    #video {
+      width: 100%;
+      max-width: 500px;
+      border: 3px solid #4CAF50;
+      border-radius: 8px;
+    }
+    #scanner-frame {
+      position: absolute;
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      height: 50%;
+      border: 2px dashed red;
+      z-index: 2;
+      pointer-events: none;
+    }
+    #scan-status {
+      margin-top: 10px;
+      font-weight: bold;
+      color: green;
+    }
   </style>
 </head>
 <body>
@@ -42,7 +63,9 @@
   <h3>Barcode Camera Scanner</h3>
   <button onclick="toggleScanner()">Start/Stop Camera Scanner</button>
   <div id="scanner-container">
+    <div id="scanner-frame"></div>
     <video id="video" autoplay></video>
+    <div id="scan-status">🔄 Scanning...</div>
   </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
@@ -101,6 +124,8 @@
     if (found) {
       addToBill(found);
       document.getElementById('scan-barcode').value = '';
+      document.getElementById('scan-status').textContent = '✅ Product Added';
+      setTimeout(() => document.getElementById('scan-status').textContent = '🔄 Scanning...', 1500);
     }
   }
 
