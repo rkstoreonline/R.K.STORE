@@ -11,6 +11,12 @@
     th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
     .product-row button { margin-right: 5px; }
     #scanner-container { display: none; position: relative; margin-top: 15px; }
+    #video {
+      width: 100%;
+      max-width: 500px;
+      border: 3px solid #4CAF50;
+      border-radius: 8px;
+    }
     #scanner-frame {
       position: absolute;
       top: 10%;
@@ -58,6 +64,7 @@
   <button onclick="toggleScanner()">Start/Stop Camera Scanner</button>
   <div id="scanner-container">
     <div id="scanner-frame"></div>
+    <video id="video" autoplay></video>
     <div id="scan-status">🔄 Scanning...</div>
   </div>
 
@@ -164,32 +171,27 @@
       inputStream: {
         name: 'Live',
         type: 'LiveStream',
-        target: document.querySelector('#scanner-container'),
+        target: document.querySelector('#video'),
         constraints: {
-          facingMode: 'environment',
-          width: { min: 640 },
-          height: { min: 480 }
+          width: 480,
+          height: 320,
+          facingMode: 'environment'
         }
       },
-      locator: {
-        patchSize: 'medium',
-        halfSample: true
-      },
-      numOfWorkers: 2,
       decoder: {
         readers: ['ean_reader', 'code_128_reader']
       },
-      locate: true
-    }, function(err) {
-      if (err) {
-        console.error('Quagga init error:', err);
-        document.getElementById('scan-status').textContent = '❌ Camera Error: ' + err.message;
-        return;
+      locate: true,
+      debug: {
+        drawBoundingBox: true,
+        showFrequency: true,
+        drawScanline: true,
+        showPattern: true
       }
+    }, err => {
+      if (err) return console.error(err);
       Quagga.start();
-      document.getElementById('scan-status').textContent = '🔄 Scanning...';
     });
-
     Quagga.onDetected(data => {
       const code = data.codeResult.code;
       document.getElementById('scan-barcode').value = code;
