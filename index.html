@@ -64,7 +64,7 @@
   <button onclick="toggleScanner()">Start/Stop Camera Scanner</button>
   <div id="scanner-container">
     <div id="scanner-frame"></div>
-    <video id="video" autoplay></video>
+    <video id="video" autoplay muted></video>
     <div id="scan-status">🔄 Scanning...</div>
   </div>
 
@@ -169,17 +169,26 @@
   function startScanner() {
     Quagga.init({
       inputStream: {
-        name: 'Live',
-        type: 'LiveStream',
+        type: "LiveStream",
         target: document.querySelector('#video'),
-        constraints: { facingMode: 'environment' }
+        constraints: {
+          width: 640,
+          height: 480,
+          facingMode: "environment"
+        }
       },
-      decoder: { readers: ['ean_reader', 'code_128_reader'] },
-      locate: true,
-      debug: true
-    }, err => {
-      if (err) return console.error(err);
+      decoder: {
+        readers: ["code_128_reader", "ean_reader"]
+      },
+      locate: true
+    }, function(err) {
+      if (err) {
+        console.error("Quagga init error:", err);
+        document.getElementById('scan-status').textContent = '❌ Camera Error: ' + err.message;
+        return;
+      }
       Quagga.start();
+      document.getElementById('scan-status').textContent = '🔄 Scanning...';
     });
 
     Quagga.onDetected(data => {
